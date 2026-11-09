@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8"><title>Japon 2026</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#bc002d">
+<meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png"><link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}html,body{margin:0;height:100%;overflow:hidden}
+body{font-family:Segoe UI,Roboto,Arial,sans-serif;background:#f6f4ef;color:#222;display:flex;flex-direction:column}
+header{background:#bc002d;color:#fff;padding:8px 10px;padding-top:calc(8px + env(safe-area-inset-top));display:flex;align-items:center;gap:8px;flex:none}
+header h1{margin:0;font-size:16px;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hb{background:rgba(255,255,255,.18);color:#fff;border:0;border-radius:18px;padding:7px 11px;font-size:13px;cursor:pointer;white-space:nowrap}
+.hb.on{background:#fff;color:#bc002d;font-weight:bold}
+#net{font-size:11px;padding:3px 7px;border-radius:10px;background:#27ae60}#net.off{background:#555}
+#chips{display:flex;gap:6px;overflow-x:auto;padding:6px 8px;background:#fff;border-bottom:1px solid #e5e5e5;flex:none;scrollbar-width:none}
+#chips::-webkit-scrollbar{display:none}
+.chip{flex:none;border:1px solid #ddd;background:#fff;border-radius:16px;padding:6px 10px;font-size:12.5px;cursor:pointer;white-space:nowrap}
+.chip.on{background:#bc002d;color:#fff;border-color:#bc002d;font-weight:bold}.chip.today{border-color:#bc002d;border-width:2px}
+#filters{display:none;background:#fff;padding:8px 10px;border-bottom:1px solid #ddd;flex:none;max-height:60vh;overflow:auto}
+#filters.open{display:block}
+#filters .row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+select,input,button{padding:8px 9px;border-radius:8px;border:1px solid #ccc;font-size:14px;font-family:inherit}
+button{cursor:pointer;background:#fff}.btn-x{background:#1d6f42;color:#fff;border-color:#1d6f42}.btn-g{background:#0f9d58;color:#fff;border-color:#0f9d58}.btn-r{background:#bc002d;color:#fff;border-color:#bc002d}
+#main{flex:1;display:flex;min-height:0;position:relative}
+#map{flex:1;min-width:0}#side{overflow:auto;padding:10px;-webkit-overflow-scrolling:touch}
+.pane{display:none}.pane.on{display:block}
+nav{display:none}
+/* Écran large (PC) : carte + panneau */
+@media(min-width:900px){#side{width:52%;flex:none}#tabs{display:flex}.nav-map{display:none!important}}
+/* Téléphone : une vue à la fois + barre d'onglets en bas */
+@media(max-width:899px){
+ #tabs{display:none}
+ nav{display:flex;flex:none;background:#fff;border-top:1px solid #ddd;padding-bottom:env(safe-area-inset-bottom)}
+ nav button{flex:1;border:0;border-radius:0;background:none;padding:6px 0 5px;font-size:10.5px;color:#555;display:flex;flex-direction:column;align-items:center;gap:1px}
+ nav button b{font-size:19px;line-height:1.1}nav button.on{color:#bc002d;font-weight:bold;background:#fff3f5}
+ #side{position:absolute;inset:0;width:auto;display:none;background:#f6f4ef}
+ body.v-side #side{display:block}body.v-side #map{visibility:hidden}
+ .leg{margin-left:8px!important}.meta,.kpi,.rkpi{grid-template-columns:1fr 1fr!important}
+ .dhead b{font-size:14px}.hide-m{display:none}
+}
+#tabs{gap:6px;margin-bottom:8px;flex-wrap:wrap}#tabs button.on{background:#bc002d;color:#fff;border-color:#bc002d}
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{width:100%;border-collapse:collapse;font-size:12.5px;background:#fff}
+th{position:sticky;top:0;background:#222;color:#fff;padding:6px;text-align:left;z-index:2}
+td{padding:6px;border-bottom:1px solid #eee;vertical-align:top}#tb tr:hover td{background:#fff3f5;cursor:pointer}
+#tb{min-width:820px}
+tr.done td{opacity:.45;text-decoration:line-through}
+.tag{display:inline-block;padding:3px 7px;border-radius:10px;color:#fff;font-size:11px;white-space:nowrap}
+.legend{display:flex;flex-wrap:wrap;gap:6px}.legend span{cursor:pointer;user-select:none}.legend span.off{opacity:.3}
+.gem{color:#d4a017;font-weight:bold}
+.dcard{background:#fff;border-radius:10px;margin-bottom:12px;box-shadow:0 1px 4px rgba(0,0,0,.12);overflow:hidden}
+.dhead{background:#222;color:#fff;padding:10px 12px;cursor:pointer;display:flex;justify-content:space-between;gap:8px;align-items:center}
+.dhead b{font-size:15px;text-transform:capitalize}.dhead small{opacity:.85}.dbody{padding:10px 12px;font-size:13.5px}
+.cost{background:#fff;color:#bc002d;border-radius:14px;padding:3px 9px;font-weight:bold;font-size:12px;white-space:nowrap}
+.meta{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px}.meta div{background:#f6f4ef;border-radius:6px;padding:6px}
+.step{display:flex;gap:8px;padding:8px 0;border-bottom:1px dashed #eee;cursor:pointer}.step:hover{background:#fff3f5}
+.hr{min-width:40px;font-weight:bold;color:#555;font-size:12px}
+.num{min-width:22px;height:22px;border-radius:50%;color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center}
+.mom{font-weight:bold;color:#bc002d;margin:8px 0 2px;font-size:12px;text-transform:uppercase}
+.tip{background:#fff8e1;border-left:4px solid #d4a017;padding:6px 8px;margin-top:8px;border-radius:4px}
+.tr{background:#e8f1fb;border-left:4px solid #2980b9;padding:6px 8px;margin-top:8px;border-radius:4px}
+.pill{font-size:11px;background:#eee;border-radius:8px;padding:1px 6px;margin-left:4px;white-space:nowrap}
+.bar{display:flex;height:16px;border-radius:4px;overflow:hidden;background:#eee}.bar i{display:block;height:100%}
+.kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}.kpi div{background:#fff;border-radius:8px;padding:8px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.1)}
+.kpi b{display:block;font-size:18px;color:#bc002d}
+input.ce{width:84px;padding:5px;text-align:right}
+.note{font-size:12px;color:#666;margin:6px 0}
+#toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:8px;display:none;z-index:9999;max-width:90vw;text-align:center;font-size:13px}
+.leg{margin:2px 0 2px 50px;padding:6px 8px;border-left:3px solid #2980b9;background:#f4f8fc;border-radius:0 6px 6px 0;font-size:12.5px;cursor:pointer}
+.leg:hover{background:#e3eefa}.leg .seg{display:block;margin:2px 0}.leg .door{display:block;margin-top:3px;color:#7a4b00}
+.ld{font-weight:bold;color:#555}.mchip{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:middle}
+.mapleg{background:#fff;padding:6px 8px;border-radius:6px;box-shadow:0 1px 4px rgba(0,0,0,.3);font-size:11px;line-height:1.55}
+.mapleg i{display:inline-block;width:20px;height:4px;margin-right:5px;vertical-align:middle}
+.mapleg.min .full{display:none}.mapleg .tg{cursor:pointer;font-weight:bold}
+.stlab{background:#fff;border:1px solid #888;border-radius:4px;padding:0 4px;font-size:10.5px;font-weight:bold}
+.rb{display:inline-block;font-size:11px;font-weight:bold;border-radius:8px;padding:1px 7px;margin-left:4px;color:#fff;white-space:nowrap}
+.rb.ok{background:#27ae60!important}
+.rbox{margin-top:4px;padding:6px 8px;border-radius:6px;font-size:12.5px;border-left:4px solid}
+.rlinks a{display:inline-block;margin:3px 6px 3px 0;padding:5px 10px;border-radius:14px;background:#bc002d;color:#fff;text-decoration:none;font-size:12px}
+.rkpi{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px}.rkpi div{background:#fff;border-radius:8px;padding:8px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.1);font-size:12px}
+.rkpi b{display:block;font-size:20px}
+tr.rdone td{background:#eefaf1}
+.rcard{background:#fff;border-radius:10px;padding:10px;margin-bottom:8px;box-shadow:0 1px 3px rgba(0,0,0,.1);font-size:13px}
+.mbtn{background:#fff;border:2px solid rgba(0,0,0,.2);border-radius:6px;width:40px;height:40px;font-size:19px;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.mbtn.on{background:#2980b9;color:#fff}
+.me{width:18px;height:18px;border-radius:50%;background:#1a73e8;border:3px solid #fff;box-shadow:0 0 0 2px rgba(26,115,232,.4),0 0 8px rgba(0,0,0,.4)}
+#upd{display:none;position:fixed;top:60px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:8px 12px;border-radius:8px;z-index:9999;font-size:13px}
+#upd button{margin-left:8px;padding:4px 10px}
+.prog{height:8px;background:#eee;border-radius:4px;overflow:hidden;margin-top:6px}.prog i{display:block;height:100%;background:#27ae60;width:0}
+.box{background:#f6f4ef;border-radius:8px;padding:8px;margin-bottom:8px}
+@media print{header,#map,#tabs,nav,#chips,#filters{display:none}html,body{overflow:visible;height:auto}#side{position:static;display:block;overflow:visible;width:auto}.pane{display:block}.dcard{break-inside:avoid}}
+</style></head><body>
+<header><h1>🇯🇵 Japon <span class="hide-m">· 11 nov → 5 déc </span>2026</h1><span id="net">●</span>
+<button class="hb" id="todayBtn">📆 Auj.</button><button class="hb" id="fBtn">⚙️ Filtres</button></header>
+<div id="chips"></div>
+<div id="filters">
+<div class="row"><select id="day" style="flex:1;min-width:140px"></select><select id="zone" style="flex:1;min-width:140px"></select></div>
+<div class="row"><input id="q" placeholder="🔍 Rechercher…" style="flex:1;min-width:150px"><label><input type="checkbox" id="gemOnly"> ⭐ Pépites</label><label><input type="checkbox" id="resOnly"> 🎟️ À réserver</label><button id="reset">Tout afficher</button></div>
+<div class="row legend" id="legend"></div>
+<div class="box"><b>📴 Mode hors ligne</b><p class="note" style="margin:3px 0 6px">L'appli s'ouvre sans réseau une fois installée. Pour avoir aussi la carte et les itinéraires à pied / voiture sans réseau, prépare-les ici en Wi-Fi.</p>
+<div class="row" style="margin:0"><button class="btn-r" id="offDay">⬇️ Carte du jour choisi</button><button id="offAll">⬇️ Carte de tout le voyage</button><button id="offRoutes">⬇️ Tous les itinéraires</button></div>
+<div id="offInfo" class="note"></div><div class="prog"><i id="offBar"></i></div></div>
+<div class="box"><b>💾 Mes données</b> <span class="note">(cases cochées, coûts modifiés, réservations : stockés sur cet appareil uniquement)</span>
+<div class="row" style="margin:6px 0 0"><button id="bkExp">📤 Sauvegarder / transférer</button><label class="hb" style="background:#fff;color:#222;border:1px solid #ccc;border-radius:8px;padding:8px 9px">📥 Importer<input type="file" id="bkImp" accept=".json,application/json" style="display:none"></label></div></div>
+<div class="row" style="margin:0"><button class="btn-x" id="xl">⬇️ Excel</button><button class="btn-g" id="gs">📋 Copier pour Google Sheets</button><button id="instBtn" class="btn-r" style="display:none">📲 Installer l'appli</button></div>
+</div>
+<div id="main"><div id="map"></div><div id="side">
+<div id="tabs"><button class="on" data-t="prog">📅 Programme</button><button data-t="tabv">📋 Tableau</button><button data-t="resa">🎟️ Réservations</button><button data-t="budget">💰 Budget</button><button data-t="transp">🚆 Guide transport</button><button data-p="1">🖨️ Imprimer</button></div>
+<div id="prog" class="pane on"></div>
+<div id="tabv" class="pane"><p class="note">✏️ Les coûts sont modifiables : touche un montant pour le challenger. Ils sont sauvegardés sur l'appareil et repris partout (budget, export). ↔️ Fais glisser le tableau horizontalement.</p>
+<div class="tw"><table id="tbl"><thead><tr><th>✓</th><th>Date</th><th>Heure</th><th>Zone</th><th>Activité</th><th>Type</th><th>Durée</th><th>Coût ¥</th><th>🎟️ Réservation</th><th>Conseil</th></tr></thead><tbody id="tb"></tbody></table></div></div>
+<div id="resa" class="pane"></div>
+<div id="budget" class="pane"></div>
+<div id="transp" class="pane"></div>
+</div></div>
+<nav id="nav"><button data-v="map" class="nav-map"><b>🗺️</b>Carte</button><button data-v="prog" class="on"><b>📅</b>Programme</button><button data-v="resa"><b>🎟️</b>Résa</button><button data-v="tabv"><b>📋</b>Tableau</button><button data-v="budget"><b>💰</b>Budget</button><button data-v="transp"><b>🚆</b>Transport</button></nav>
+<div id="toast"></div><div id="upd">Nouvelle version disponible <button id="updBtn">Mettre à jour</button></div>
+<script src="data.js"></script>
+<script src="data2.js"></script>
+<script src="app.js"></script>
+</body></html>
